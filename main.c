@@ -1,46 +1,42 @@
-/**
-  @file    main.c
-  @author  h0rr0rr_drag0n
-  @version V0.0.1
-  @date    22-Aug-2011
-  @brief   Template of Linux project for STM32VLDiscovery
-**/
-
 #include "stm32f10x.h"
+#include "core_cm3.h"
 
-/**
-   @brief  Enable clocking on various system peripheral devices
-   @params None
-   @retval None
-**/
-void RCC_init() {
-  /* enable clocking on Port C */
-  RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
+volatile uint32_t state = 0x00000000;
+
+int main(void)
+{
+
+
+
+RCC->APB2ENR |= RCC_APB2ENR_IOPCEN; //enable GPIOC clock
+RCC->APB1ENR |= RCC_APB1ENR_TIM2EN; //enable timer TIM2 clock
+
+TIM2->PSC = 24000 - 1; //set prescaler for TIM2 as 24000
+TIM2->ARR = 1000 - 1; //set auto-reload value for TIM2 as 1000
+TIM2->CR1 |= TIM_CR1_CEN; //enable timer TIM2
+SCB->AIRCR |= SCB_AIRCR_PRIGROUP0; //set Interrupt priority group 0
+NVIC->ISER[0] |= NVIC_ISER_SETENA_28; //enable nested interrupt for TIM2
+NVIC->IP[7] |= 0x10; //set priority for TIM2
+TIM2->DIER |= TIM_DIER_UIE; //unable update interrupt for TIM2
+
+
+GPIOC->CRH &= ~GPIO_CRH_CNF8_0; //disable GPIOC8 input mode
+GPIOC->CRH |= GPIO_CRH_MODE8_1; //set GPIOC8 to output mode with max speed 2 MHz
+GPIOC->CRH &= ~GPIO_CRH_CNF9_0; //disable GPIOC9 input mode
+GPIOC->CRH |= GPIO_CRH_MODE9_1; //set GPIOC9 to output mode with max speed 2 MHz
+
+while(1){}	
+
 }
 
-int main(void) {
-  GPIO_InitTypeDef GPIOC_init_params;
+void TIM2_IRQHandler(void){
+TIM2->SR ^= TIM_SR_UIF;
+	GPIOC->ODR = state;
+	GPIOC->BSRR |= GPIO_BSRR_BS8;
+	state = 0xFFFFFFFF-state;
+}
 
-  RCC_init();
-
-  /* Blue LED sits on PC[8] and Green LED sits on PC[9]*/
-  GPIOC_init_params.GPIO_Pin = GPIO_Pin_8 | GPIO_Pin_9;
-  /* Output maximum frequency selection is 10 MHz.
-     Do not worry that internal oscillator of STM32F100RB
-     works on 8MHz frequency - Cortex-M3 core has a various
-     facilities to carefully tune the frequency for almost
-     peripheral devices.
-  */
-  GPIOC_init_params.GPIO_Speed = GPIO_Speed_10MHz;
-  /* Push-pull output.
-     Двухтактный выход.
-  */
-  GPIOC_init_params.GPIO_Mode = GPIO_Mode_Out_PP;
-  GPIO_Init(GPIOC, &GPIOC_init_params);
-
-  /* Set pins 8 and 9 at PORTC to high level */
-  GPIO_SetBits(GPIOC, GPIO_Pin_8);
-  GPIO_SetBits(GPIOC, GPIO_Pin_9);
-  
-  while (1) {}
+void _exit(int i)
+{
+    while (1);
 }
